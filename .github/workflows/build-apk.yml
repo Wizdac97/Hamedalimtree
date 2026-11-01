@@ -1,0 +1,61 @@
+name: Build Hamed Al-Alim Family Tree APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract uploaded Android project archive
+        run: |
+          if [ -f Hamed_AlAlim_Family_Android_Project.zip ]; then
+            unzip -o Hamed_AlAlim_Family_Android_Project.zip -d .
+          fi
+          test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build installable APKs
+        run: |
+          gradle assembleDebug assembleRelease --no-daemon --stacktrace
+          mkdir -p output-apk
+          cp app/build/outputs/apk/debug/app-debug.apk output-apk/Hamed-AlAlim-Family-Tree-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk output-apk/Hamed-AlAlim-Family-Tree.apk
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hamed-AlAlim-Family-Tree-APK
+          path: output-apk/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Hamed Al-Alim Family Tree v1.0.${{ github.run_number }}
+          body: APK files built automatically by GitHub Actions.
+          files: output-apk/*.apk
