@@ -23,6 +23,22 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
 
+      - name: Add legacy launcher icons for Android versions below 26
+        run: |
+          for icon in ic_launcher.xml ic_launcher_round.xml; do
+            cat > "app/src/main/res/mipmap/$icon" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="48dp"
+              android:height="48dp"
+              android:viewportWidth="48"
+              android:viewportHeight="48">
+              <path android:fillColor="#173D35" android:pathData="M0,0h48v48h-48z" />
+              <path android:fillColor="#F4D9A2" android:pathData="M24,5 L11,22 H18 L9,33 H19 V43 H29 V33 H39 L30,22 H37 Z" />
+          </vector>
+          EOF
+          done
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
