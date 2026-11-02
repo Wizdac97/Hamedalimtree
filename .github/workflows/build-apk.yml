@@ -1,4 +1,84 @@
-name: Build APK
+name: Build APKname: Build APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Extract Project Zip
+      run: |
+        if [ -f "Hamed_AlAlim_Family_Android_Project.zip" ]; then
+          unzip -o Hamed_AlAlim_Family_Android_Project.zip
+          if [ ! -f "settings.gradle" ] && [ ! -f "settings.gradle.kts" ]; then
+            SUBFOLDER=$(find . -maxdepth 2 \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | xargs dirname)
+            if [ -n "$SUBFOLDER" ] && [ -d "$SUBFOLDER" ]; then
+              cp -rn "$SUBFOLDER"/* . 2>/dev/null || true
+              cp -rn "$SUBFOLDER"/.* . 2>/dev/null || true
+            fi
+          fi
+        fi
+
+    - name: Fix Min SDK and Adaptive Icons
+      run: |
+        find . -name "build.gradle*" -exec sed -i 's/minSdkVersion [0-9]*/minSdkVersion 26/g' {} +
+        find . -name "build.gradle*" -exec sed -i 's/minSdk [0-9]*/minSdk 26/g' {} +
+        find . -name "build.gradle*" -exec sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 26/g' {} +
+        find . -name "build.gradle*" -exec sed -i 's/minSdk = [0-9]*/minSdk = 26/g' {} +
+        find . -path "*/src/main/res/mipmap" -type d | while read dir; do
+          mkdir -p "$dir-anydpi-v26"
+          [ -f "$dir/ic_launcher.xml" ] && mv "$dir/ic_launcher.xml" "$dir-anydpi-v26/" || true
+          [ -f "$dir/ic_launcher_round.xml" ] && mv "$dir/ic_launcher_round.xml" "$dir-anydpi-v26/" || true
+        done
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Accept Android SDK Licenses
+      run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v3
+
+    - name: Assemble APK
+      run: |
+        chmod +x gradlew || true
+        ./gradlew assembleRelease --no-daemon --stacktrace || ./gradlew assembleDebug --no-daemon --stacktrace
+
+    - name: Copy Output APK
+      run: |
+        mkdir -p output-apk
+        APK_FILE=$(find . -name "*.apk" | grep -E "app-release|app-release-unsigned|app-debug" | head -n 1)
+        if [ -z "$APK_FILE" ]; then
+          APK_FILE=$(find . -name "*.apk" | head -n 1)
+        fi
+        if [ -n "$APK_FILE" ]; then
+          cp "$APK_FILE" output-apk/Hamed-AlAlim-Family-Tree.apk
+          echo "Successfully copied $APK_FILE to output-apk/Hamed-AlAlim-Family-Tree.apk"
+        else
+          echo "No APK found"
+          exit 1
+        fi
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hamed-AlAlim-Family-Tree-APK
+        path: output-apk/Hamed-AlAlim-Family-Tree.apk
 
 on:
   push:
