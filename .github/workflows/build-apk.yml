@@ -23,12 +23,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: إعداد حزمة تطوير أندرويد (Set up Android SDK)
-        uses: android-actions/setup-android@v3
-
       - name: قبول تراخيص أندرويد (Accept Android SDK Licenses)
         run: |
-          yes | sdkmanager --licenses || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/devnull || true
 
       - name: إعداد Gradle 8.7 (Set up Gradle)
         uses: gradle/actions/setup-gradle@v4
