@@ -1,4 +1,4 @@
-name: بناء تطبيق شجرة عائلة حامد العالم (Build Hamed Al-Alim Family Tree APK)
+name: Build APK
 
 on:
   push:
@@ -10,67 +10,46 @@ permissions:
 
 jobs:
   build-apk:
-    name: تجميع وبناء ملف APK
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: سحب ملفات المشروع (Checkout Repository)
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: إعداد بيئة جافا (Set up JDK 17)
+      - name: Extract Project Zip
+        run: |
+          if [ -f "Hamed_AlAlim_Family_Android_Project.zip" ]; then
+            unzip -o Hamed_AlAlim_Family_Android_Project.zip
+            if [ ! -f "settings.gradle" ] && [ ! -f "settings.gradle.kts" ]; then
+              SUBFOLDER=$(find . -maxdepth 2 \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | cut -d'/' -f2)
+              if [ -n "$SUBFOLDER" ] && [ -d "$SUBFOLDER" ]; then
+                cp -rn "$SUBFOLDER"/* . 2>/dev/null || true
+                cp -rn "$SUBFOLDER"/.* . 2>/dev/null || true
+              fi
+            fi
+          fi
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: قبول تراخيص أندرويد (Accept Android SDK Licenses)
+      - name: Accept Android SDK Licenses
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/devnull || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
 
-      - name: إعداد Gradle 8.7 (Set up Gradle)
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      - name: استعادة مفتاح التوقيع من الأسرار (Restore Keystore)
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Assemble APK
         run: |
-          if [ ! -f "app/release-key.jks" ] && [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > app/release-key.jks
-            echo "Keystore restored from GitHub Secrets."
-          fi
-
-      - name: بناء ملف APK (Assemble APK)
-        run: |
-          if [ -f "app/release-key.jks" ]; then
-            echo "Signing key found. Building signed release APK..."
-            gradle assembleRelease --no-daemon --stacktrace
-            mkdir -p output-apk
-            cp app/build/outputs/apk/release/app-release.apk output-apk/Hamed-AlAlim-Family-Tree.apk
+          chmod +x gradlew 2>/dev/null || true
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleRelease --no-daemon --stacktrace || ./gradlew assembleDebug --no-daemon --stacktrace
           else
-            echo "Signing key not found. Falling back to debug APK..."
-            gradle assembleDebug --no-daemon --stacktrace
-            mkdir -p output-apk
-            cp app/build/outputs/apk/debug/app-debug.apk output-apk/Hamed-AlAlim-Family-Tree.apk
+            gradle assembleRelease --no-daemon --stacktrace || gradle assembleDebug --no-daemon --stacktrace
           fi
-
-      - name: رفع ملف APK الجاهز (Upload Artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          name: Hamed-AlAlim-Family-Tree-APK
-          path: output-apk/Hamed-AlAlim-Family-Tree.apk
-          if-no-files-found: error
-
-      - name: نشر الإصدار في قسم Releases (Create GitHub Release)
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.1.${{ github.run_number }}
-          name: "تطبيق شجرة عائلة حامد العالم — v1.1.${{ github.run_number }}"
-          body: |
-            ## 🌿 تطبيق شجرة عائلة حامد العالم للأندرويد
-            - قم بتحميل ملف **`Hamed-AlAlim-Family-Tree.apk`** أدناه وتثبيته مباشرة على الهاتف.
-            - إذا ظهر تنبيه Play Protect، اختر **More details (مزيد من التفاصيل)** ثم **Install anyway (التثبيت على أي حال)**.
-          files: |
-            output-apk/Hamed-AlAlim-Family-Tree.apk
